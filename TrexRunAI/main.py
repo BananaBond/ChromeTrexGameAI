@@ -5,9 +5,9 @@ import os
 
 WIN_WIDTH = 1920
 WIN_HEIGHT = 800
-FLOOR = 730
+FLOOR = 680
 
-GAME_SPEED = 5
+GAME_SPEED = 10
 
 WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
@@ -35,7 +35,7 @@ class Player:
         self.x = x
         self.y = y
         self.vel = 0
-        self.height = self.y
+        self.height = 120
         self.img = self.IMGS[0]
         self.tick_count = 0
         self.img_count = 0
@@ -91,7 +91,7 @@ class Saw:
         self.saw_height()
 
     def saw_height(self):
-        choice = random.choice([FLOOR + 120, FLOOR + 180])
+        choice = random.choice([FLOOR - 120, FLOOR - 200])
         self.y = choice
 
     def move(self):
@@ -105,16 +105,16 @@ class Saw:
 
         saw_mask = pygame.mask.from_surface(self.img)
         offset = (self.x - player.x, self.y - round(player.y))
-
-        if offset:
+        point = player_mask.overlap(saw_mask, offset)
+        if point:
             return True
         return False
 
 
 class Base:
     VEL = GAME_SPEED
+    WIDTH = TILE_IMG.get_width()
     IMG = TILE_IMG
-    WIDTH = 1920
 
     def __init__(self, y):
         self.y = y
@@ -136,22 +136,23 @@ class Base:
         win.blit(self.IMG, (self.x2, self.y))
 
 
-def draw_window(win, players, saws,  base):
+def draw_window(win, players, saws, base):
     win.blit(BG_IMG, (0, 0))
     for player in players:
         player.draw(win)
     for saw in saws:
         saw.draw(win)
-    pygame.display.update()
     base.draw(win)
+    pygame.display.update()
 
 
 def main():
-    player = Player(200, 200)
+    player = Player(200, FLOOR - 400)
+
     players = [player]
 
-    base = Base(800-128)
-    saw = Saw(100, 100)
+    base = Base(800 - 120)
+    saw = Saw(1000, FLOOR-120)
     saws = [saw]
 
     saw.move()
@@ -161,10 +162,22 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+
+        for player in players:
+            if player.y > FLOOR-120:
+                player.y = FLOOR-120
+
+        for saw in saws:
+            for x, player in enumerate(players):
+                if saw.collide(player):
+                    players.pop(x)
         draw_window(WIN, players, saws, base)
 
         base.move()
-        player.move()
+        for player in players:
+            player.move()
+        for saw in saws:
+            saw.move()
 
     pygame.quit()
     quit()
