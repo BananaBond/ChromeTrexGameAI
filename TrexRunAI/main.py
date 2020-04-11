@@ -7,7 +7,7 @@ WIN_WIDTH = 1920
 WIN_HEIGHT = 800
 FLOOR = 680
 
-GAME_SPEED = 10
+GAME_SPEED = 15
 
 WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
@@ -15,9 +15,9 @@ BG_IMG = (pygame.image.load(os.path.join("imgs", "BG.png")))
 RUN_IMG = [pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Run__001.png")), (120, 120)),
            pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Run__004.png")), (120, 120)),
            pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Run__008.png")), (120, 120))]
-SLIDE_IMG = pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Slide__000.png")), (120, 120))
+SLIDE_IMG = pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Slide__000.png")), (90, 90))
 DEAD_IMG = pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Dead__009.png")), (120, 120))
-JUMP_IMG = pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Jump__001.png")), (120, 120))
+JUMP_IMG = pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Jump__001.png")), (80, 80))
 SAW_IMG = pygame.transform.scale(pygame.image.load(os.path.join("imgs", "Saw.png")), (120, 120))
 TILE_IMG = pygame.image.load(os.path.join("imgs", "Tilemap.png"))
 
@@ -29,24 +29,26 @@ gen = 0
 
 class Player:
     IMGS = RUN_IMG
-    ANIMATION_TIME = 0
+
+    ANIMATION_TIME = 5
 
     def __init__(self, x, y):
         self.x = x
-        self.y = y
+        self.y = y + 30
         self.vel = 0
         self.height = 120
-        self.img = self.IMGS[0]
+        self.img = SLIDE_IMG
+
         self.tick_count = 0
         self.img_count = 0
 
     def jump(self):
-        self.vel = -10.5
-        self.height = self.y
+        self.vel = -19.5
+
         self.tick_count = 0
 
     def move(self):
-        self.tick_count += 2
+        self.tick_count += 1
         disp = self.vel * self.tick_count + 1.5 * self.tick_count ** 2
 
         if disp >= 16:
@@ -75,6 +77,14 @@ class Player:
         new_rect = self.img.get_rect(center=self.img.get_rect(topleft=(self.x, self.y)).center)
         win.blit(self.img, new_rect.topleft)
 
+    def duck(self):
+        self.img = SLIDE_IMG
+        self.height = 90
+
+    def unduck(self):
+        self.height = 120
+
+
     def get_mask(self):
         return pygame.mask.from_surface(self.img)
 
@@ -91,7 +101,7 @@ class Saw:
         self.saw_height()
 
     def saw_height(self):
-        choice = random.choice([FLOOR - 120, FLOOR - 200])
+        choice = random.choice([FLOOR - 120, FLOOR - 210])
         self.y = choice
 
     def move(self):
@@ -152,25 +162,48 @@ def main():
     players = [player]
 
     base = Base(800 - 120)
-    saw = Saw(1000, FLOOR-120)
-    saws = [saw]
 
-    saw.move()
+    saws = []
+    saw = Saw(1000, FLOOR - 120)
+    saws.append(saw)
+
     run = True
 
     while run:
+        if len(saws) < 2:
+            saws.append(Saw(2000, FLOOR-120))
+        
+
+
+
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
 
-        for player in players:
-            if player.y > FLOOR-120:
-                player.y = FLOOR-120
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_DOWN:
+                    player.duck()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_DOWN:
+                    player.unduck()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_UP:
+                    player.jump()
 
-        for saw in saws:
+        for player in players:
+            if player.y > FLOOR - player.height:
+                player.y = FLOOR - player.height
+
+        for y, saw in enumerate(saws):
             for x, player in enumerate(players):
                 if saw.collide(player):
                     players.pop(x)
+                if saw.x < player.x:
+                    saw.passed = True
+                if saw.x < 0:
+                    saws.pop(y)
+
         draw_window(WIN, players, saws, base)
 
         base.move()
