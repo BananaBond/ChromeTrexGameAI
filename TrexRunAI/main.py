@@ -5,7 +5,7 @@ import os
 
 WIN_WIDTH = 1920
 WIN_HEIGHT = 800
-FLOOR = 680
+FLOOR = 670
 
 GAME_SPEED = 15
 
@@ -41,15 +41,24 @@ class Player:
         self.isDuck = False
         self.tick_count = 0
         self.img_count = 0
+        self.onGround = False
 
     def jump(self):
-        if self.isDuck:
-            pass
-        self.vel = -15.5
-        self.isDuck = False
-        self.tick_count = 0
+        if self.onGround:
+            self.vel = -15.5
+            self.isDuck = False
+            self.tick_count = 0
 
     def move(self):
+        if self.y >= FLOOR - self.height:
+            self.y = FLOOR - self.height
+            self.onGround = True
+
+        if self.y < FLOOR - self.height:
+            self.onGround = False
+        else:
+            self.onGround = True
+
         self.tick_count += 1
         disp = self.vel * self.tick_count + 1.5 * self.tick_count ** 2
 
@@ -84,9 +93,10 @@ class Player:
         win.blit(self.img, new_rect.topleft)
 
     def duck(self):
-        self.img = SLIDE_IMG
-        self.isDuck = True
-        self.height = 90
+        if self.onGround:
+            self.img = SLIDE_IMG
+            self.isDuck = True
+            self.height = 90
 
     def unduck(self):
         self.height = 120
@@ -174,8 +184,8 @@ def draw_window(win, players, saws, base, score):
     pygame.display.update()
 
 
-#
-def eval_genomes(genomes, config):
+#genomes, config
+def eval_genomes():
     nets = []  # Neural nets for all the birds
     ge = []  # The bird neat variable with all the fitness and shit
     players = []  # The bird object
@@ -183,17 +193,17 @@ def eval_genomes(genomes, config):
     win = WIN
     gen += 1
 
-    for _, g in genomes:
-        g.fitness = 0
-        # For each bird/Genome, create a new network
-        net = neat.nn.FeedForwardNetwork.create(g, config)
-        nets.append(net)
-        players.append(Player(200, FLOOR - 400))
-        ge.append(g)
+    # for _, g in genomes:
+    #     g.fitness = 0
+    #     # For each bird/Genome, create a new network
+    #     net = neat.nn.FeedForwardNetwork.create(g, config)
+    #     nets.append(net)
+    #     players.append(Player(200, FLOOR - 400))
+    #     ge.append(g)
 
     score = 0
 
-    # players.append(Player(200, 200))
+    players.append(Player(200, 200))
 
     base = Base(800 - 120)
 
@@ -219,16 +229,16 @@ def eval_genomes(genomes, config):
                 break
 
             # Single Player controls
-            # if event.type == pygame.KEYDOWN:
-            #     if event.key == pygame.K_DOWN:
-            #         player.duck()
-            # if event.type == pygame.KEYUP:
-            #     if event.key == pygame.K_DOWN:
-            #         player.unduck()
-            #
-            # if event.type == pygame.KEYDOWN:
-            #     if event.key == pygame.K_UP:
-            #         player.jump()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_DOWN:
+                    player.duck()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_DOWN:
+                    player.unduck()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    player.jump()
 
         if len(players) <= 0:
             run = False
@@ -237,39 +247,37 @@ def eval_genomes(genomes, config):
         if saws[0].x < players[0].x:
             saw_ind = 1
 
-        for x, player in enumerate(players):
-
-            ge[x].fitness += 0.1
+        # for x, player in enumerate(players):
+        #     ge[x].fitness += 0.1
 
             # Output = net.activate(inputs)
-            output = nets[x].activate(
-                (player.y, saws[saw_ind].y, saws[saw_ind].x - players[0].x))
+            # output = nets[x].activate(
+            #     (player.y, saws[saw_ind].y, saws[saw_ind].x - players[0].x))
 
-        if output[0] > 0.5:
-            player.jump()
-        if output[1] > 0.5:
-            player.duck()
-        if output[1] < 0.5:
-            player.unduck()
+        # if output[0] > 0.5:
+        #     player.jump()
+        # if output[1] > 0.5:
+        #     player.duck()
+        # if output[1] < 0.5:
+        #     player.unduck()
 
-        for player in players:
-            if player.y > FLOOR - player.height:
-                player.y = FLOOR - player.height
+
+
 
         for y, saw in enumerate(saws):
             for x, player in enumerate(players):
 
                 if saw.collide(player) or player.y < 0:
-                    ge[x].fitness -= 1
                     players.pop(x)
-                    nets.pop(x)
-                    ge.pop(x)
+                    # ge[x].fitness -= 1
+                    # nets.pop(x)
+                    # ge.pop(x)
 
             if not saw.passed and saw.x < player.x:
                 saw.passed = True
                 score += 1
-                for g in ge:
-                    g.fitness += 5
+                # for g in ge:
+                #     g.fitness += 5
 
             if saw.x < 0:
                 saws.remove(saw)
@@ -281,26 +289,28 @@ def eval_genomes(genomes, config):
             player.move()
         for saw in saws:
             saw.move()
+
+
 #
 #
-# eval_genomes()
+eval_genomes()
 
-
-def run(config_file):
-    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                                config_file)
-
-    p = neat.Population(config)
-
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
-    p.add_reporter(stats)
-
-    winner = p.run(eval_genomes, 50)
-
-
-if __name__ == '__main__':
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config-feedforward.txt')
-    run(config_path)
+#
+# def run(config_file):
+#     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+#                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
+#                                 config_file)
+#
+#     p = neat.Population(config)
+#
+#     p.add_reporter(neat.StdOutReporter(True))
+#     stats = neat.StatisticsReporter()
+#     p.add_reporter(stats)
+#
+#     winner = p.run(eval_genomes, 50)
+#
+#
+# if __name__ == '__main__':
+#     local_dir = os.path.dirname(__file__)
+#     config_path = os.path.join(local_dir, 'config-feedforward.txt')
+#     run(config_path)
