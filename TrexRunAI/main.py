@@ -38,13 +38,15 @@ class Player:
         self.vel = 0
         self.height = 120
         self.img = SLIDE_IMG
-
+        self.isDuck = False
         self.tick_count = 0
         self.img_count = 0
 
     def jump(self):
-        self.vel = -19.5
-
+        if self.isDuck:
+            pass
+        self.vel = -15.5
+        self.isDuck = False
         self.tick_count = 0
 
     def move(self):
@@ -59,9 +61,10 @@ class Player:
         self.y += disp
 
     def draw(self, win):
-        self.img_count += 1
 
         # Cycling through images
+
+        self.img_count += 1
         if self.img_count < self.ANIMATION_TIME:
             self.img = self.IMGS[0]
         elif self.img_count < self.ANIMATION_TIME * 2:
@@ -74,16 +77,20 @@ class Player:
             self.img = self.IMGS[0]
             self.img_count = 0
 
+        if self.isDuck:
+            self.img = SLIDE_IMG
+
         new_rect = self.img.get_rect(center=self.img.get_rect(topleft=(self.x, self.y)).center)
         win.blit(self.img, new_rect.topleft)
 
     def duck(self):
         self.img = SLIDE_IMG
+        self.isDuck = True
         self.height = 90
 
     def unduck(self):
         self.height = 120
-
+        self.isDuck = False
 
     def get_mask(self):
         return pygame.mask.from_surface(self.img)
@@ -150,6 +157,7 @@ def draw_window(win, players, saws, base, score):
     win.blit(BG_IMG, (0, 0))
     for player in players:
         player.draw(win)
+
     for saw in saws:
         saw.draw(win)
     base.draw(win)
@@ -166,10 +174,10 @@ def draw_window(win, players, saws, base, score):
     pygame.display.update()
 
 
+#
 def eval_genomes(genomes, config):
-
-    nets = []   # Neural nets for all the birds
-    ge = []     # The bird neat variable with all the fitness and shit
+    nets = []  # Neural nets for all the birds
+    ge = []  # The bird neat variable with all the fitness and shit
     players = []  # The bird object
     global WIN, gen
     win = WIN
@@ -185,7 +193,7 @@ def eval_genomes(genomes, config):
 
     score = 0
 
-
+    # players.append(Player(200, 200))
 
     base = Base(800 - 120)
 
@@ -201,11 +209,7 @@ def eval_genomes(genomes, config):
 
         # Spawn second saw
         if len(saws) < 2:
-            saws.append(Saw(2000, FLOOR-120))
-        
-
-
-
+            saws.append(Saw(2000, FLOOR - 120))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -214,15 +218,15 @@ def eval_genomes(genomes, config):
                 quit()
                 break
 
-
-            #  Single Player controls
+            # Single Player controls
             # if event.type == pygame.KEYDOWN:
             #     if event.key == pygame.K_DOWN:
             #         player.duck()
             # if event.type == pygame.KEYUP:
             #     if event.key == pygame.K_DOWN:
             #         player.unduck()
-            # if event.type == pygame.KEYUP:
+            #
+            # if event.type == pygame.KEYDOWN:
             #     if event.key == pygame.K_UP:
             #         player.jump()
 
@@ -233,34 +237,29 @@ def eval_genomes(genomes, config):
         if saws[0].x < players[0].x:
             saw_ind = 1
 
-
         for x, player in enumerate(players):
 
             ge[x].fitness += 0.1
 
-            # output = net.activate(inputs)
+            # Output = net.activate(inputs)
             output = nets[x].activate(
                 (player.y, saws[saw_ind].y, saws[saw_ind].x - players[0].x))
 
-
-            if output[0] > 0.5:
-                player.jump()
-            if output[1] > 0.5:
-                player.duck()
-
+        if output[0] > 0.5:
+            player.jump()
+        if output[1] > 0.5:
+            player.duck()
+        if output[1] < 0.5:
+            player.unduck()
 
         for player in players:
             if player.y > FLOOR - player.height:
                 player.y = FLOOR - player.height
 
-
-
-
-
         for y, saw in enumerate(saws):
             for x, player in enumerate(players):
 
-                if saw.collide(player):
+                if saw.collide(player) or player.y < 0:
                     ge[x].fitness -= 1
                     players.pop(x)
                     nets.pop(x)
@@ -275,13 +274,6 @@ def eval_genomes(genomes, config):
             if saw.x < 0:
                 saws.remove(saw)
 
-
-
-
-
-
-
-
         draw_window(WIN, players, saws, base, score)
 
         base.move()
@@ -289,10 +281,9 @@ def eval_genomes(genomes, config):
             player.move()
         for saw in saws:
             saw.move()
-
-
-
-
+#
+#
+# eval_genomes()
 
 
 def run(config_file):
