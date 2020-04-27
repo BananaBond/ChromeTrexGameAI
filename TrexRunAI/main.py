@@ -300,7 +300,7 @@ def eval_genomes(genomes, config):
 
         for y, saw in enumerate(saws):
             for x, player in enumerate(players):
-                
+
                 if saw.collide(player) or player.y < 0:
                     players.pop(x)
                     ge[x].fitness -= 7
