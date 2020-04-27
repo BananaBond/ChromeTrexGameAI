@@ -3,4 +3,4 @@
 
 1. I didn't add a ceiling at first and the jump did not diasble. So naturally the AI learned to perma jump.
 
-![](1. All jumping record.gif)
+![Title ](1. All jumping record.gif)
