@@ -1,13 +1,16 @@
 import pygame
 import neat
 import random
+import gzip
 import os
+
+from pygame.rect import Rect
 
 WIN_WIDTH = 1920
 WIN_HEIGHT = 800
 FLOOR = 670
 
-GAME_SPEED = 15
+GAME_SPEED = 20
 
 WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
@@ -25,6 +28,7 @@ pygame.font.init()
 STAT_FONT = pygame.font.SysFont("roboto", 30)
 
 gen = 0
+prev = FLOOR - 120
 
 
 class Player:
@@ -42,10 +46,14 @@ class Player:
         self.tick_count = 0
         self.img_count = 0
         self.onGround = False
+        self.rect = Rect(self.x, self.y, self.img.get_height(), self.img.get_width())
+        self.duckTimer = 0
 
     def jump(self):
+
         if self.onGround:
-            self.vel = -15.5
+            self.duckTimer = 0
+            self.vel = -13.5
             self.isDuck = False
             self.tick_count = 0
 
@@ -72,7 +80,7 @@ class Player:
     def draw(self, win):
 
         # Cycling through images
-
+        self.rect.y = self.y
         self.img_count += 1
         if self.img_count < self.ANIMATION_TIME:
             self.img = self.IMGS[0]
@@ -93,12 +101,14 @@ class Player:
         win.blit(self.img, new_rect.topleft)
 
     def duck(self):
+
         if self.onGround:
-            self.img = SLIDE_IMG
+            self.duckTimer += 0.1
             self.isDuck = True
             self.height = 90
 
     def unduck(self):
+        self.duckTimer = 0
         self.height = 120
         self.isDuck = False
 
@@ -112,28 +122,43 @@ class Saw:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.height = 0
+        self.height = FLOOR - 120
         self.img = SAW_IMG
         self.passed = False
+        self.rect = Rect(self.x, self.y, 120, 120)
+
         self.saw_height()
 
     def saw_height(self):
-        choice = random.choice([FLOOR - 120, FLOOR - 210])
+        # choice = random.choice([FLOOR - 120, FLOOR - 210])
+        global prev
+        if prev == FLOOR - 210:
+            choice = FLOOR - 120
+            prev = choice
+        else:
+            choice = FLOOR - 210
+            prev = FLOOR - 210
+        # choice = FLOOR - 210
         self.y = choice
+        self.rect.y = choice
 
     def move(self):
         self.x -= self.VEL
 
     def draw(self, win):
+        self.rect.x = self.x
         win.blit(self.img, (self.x, self.y))
 
     def collide(self, player):
-        player_mask = player.get_mask()
-
-        saw_mask = pygame.mask.from_surface(self.img)
-        offset = (self.x - player.x, self.y - round(player.y))
-        point = player_mask.overlap(saw_mask, offset)
-        if point:
+        # player_mask = player.get_mask()
+        #
+        # saw_mask = pygame.mask.from_surface(self.img)
+        # offset = (self.x - player.x, self.y - round(player.y))
+        # point = player_mask.overlap(saw_mask, offset)
+        # if point:
+        #     return True
+        # return False
+        if pygame.sprite.collide_rect(self, player):
             return True
         return False
 
@@ -184,8 +209,8 @@ def draw_window(win, players, saws, base, score):
     pygame.display.update()
 
 
-#genomes, config
-def eval_genomes():
+#
+def eval_genomes(genomes, config):
     nets = []  # Neural nets for all the birds
     ge = []  # The bird neat variable with all the fitness and shit
     players = []  # The bird object
@@ -193,17 +218,17 @@ def eval_genomes():
     win = WIN
     gen += 1
 
-    # for _, g in genomes:
-    #     g.fitness = 0
-    #     # For each bird/Genome, create a new network
-    #     net = neat.nn.FeedForwardNetwork.create(g, config)
-    #     nets.append(net)
-    #     players.append(Player(200, FLOOR - 400))
-    #     ge.append(g)
+    for _, g in genomes:
+        g.fitness = 0
+        # For each bird/Genome, create a new network
+        net = neat.nn.FeedForwardNetwork.create(g, config)
+        nets.append(net)
+        players.append(Player(200, FLOOR - 400))
+        ge.append(g)
 
     score = 0
 
-    players.append(Player(200, 200))
+    # players.append(Player(200, 200))
 
     base = Base(800 - 120)
 
@@ -215,7 +240,7 @@ def eval_genomes():
     clock = pygame.time.Clock()
 
     while run:
-        clock.tick(30)
+        clock.tick(60)
 
         # Spawn second saw
         if len(saws) < 2:
@@ -229,16 +254,16 @@ def eval_genomes():
                 break
 
             # Single Player controls
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    player.duck()
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_DOWN:
-                    player.unduck()
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    player.jump()
+            # if event.type == pygame.KEYDOWN:
+            #     if event.key == pygame.K_DOWN:
+            #         player.duck()
+            # if event.type == pygame.KEYUP:
+            #     if event.key == pygame.K_DOWN:
+            #         player.unduck()
+            #
+            # if event.type == pygame.KEYDOWN:
+            #     if event.key == pygame.K_UP:
+            #         player.jump()
 
         if len(players) <= 0:
             run = False
@@ -247,37 +272,46 @@ def eval_genomes():
         if saws[0].x < players[0].x:
             saw_ind = 1
 
-        # for x, player in enumerate(players):
-        #     ge[x].fitness += 0.1
+        for x, player in enumerate(players):
+            ge[x].fitness += 0.1
+            if player.isDuck:
+                ge[x].fitness -= player.duckTimer
+
+            if saws[saw_ind].y == FLOOR - 120:
+                choice = 100
+            else:
+                choice = -100
 
             # Output = net.activate(inputs)
-            # output = nets[x].activate(
-            #     (player.y, saws[saw_ind].y, saws[saw_ind].x - players[0].x))
+            output = nets[x].activate(
+                (choice, abs(saws[saw_ind].x - players[0].x)))
 
-        # if output[0] > 0.5:
-        #     player.jump()
-        # if output[1] > 0.5:
-        #     player.duck()
-        # if output[1] < 0.5:
-        #     player.unduck()
-
-
-
+            if output[0] > 0.5 and output[1] > 0.5:
+                if output[0] > output[1]:
+                    player.jump()
+                else:
+                    player.duck()
+            elif output[0] > 0.5:
+                player.jump()
+            elif output[1] > 0.5:
+                player.duck()
+            if output[1] < 0.5:
+                player.unduck()
 
         for y, saw in enumerate(saws):
             for x, player in enumerate(players):
-
+                
                 if saw.collide(player) or player.y < 0:
                     players.pop(x)
-                    # ge[x].fitness -= 1
-                    # nets.pop(x)
-                    # ge.pop(x)
+                    ge[x].fitness -= 7
+                    nets.pop(x)
+                    ge.pop(x)
 
             if not saw.passed and saw.x < player.x:
                 saw.passed = True
                 score += 1
-                # for g in ge:
-                #     g.fitness += 5
+                for g in ge:
+                    g.fitness += 5
 
             if saw.x < 0:
                 saws.remove(saw)
@@ -293,24 +327,24 @@ def eval_genomes():
 
 #
 #
-eval_genomes()
+# eval_genomes()
 
-#
-# def run(config_file):
-#     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
-#                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
-#                                 config_file)
-#
-#     p = neat.Population(config)
-#
-#     p.add_reporter(neat.StdOutReporter(True))
-#     stats = neat.StatisticsReporter()
-#     p.add_reporter(stats)
-#
-#     winner = p.run(eval_genomes, 50)
-#
-#
-# if __name__ == '__main__':
-#     local_dir = os.path.dirname(__file__)
-#     config_path = os.path.join(local_dir, 'config-feedforward.txt')
-#     run(config_path)
+
+def run(config_file):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+
+    p = neat.Population(config)
+
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+
+    winner = p.run(eval_genomes, 50)
+
+
+if __name__ == '__main__':
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, 'config-feedforward.txt')
+    run(config_path)
